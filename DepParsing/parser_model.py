@@ -126,7 +126,7 @@ class ParserModel(nn.Module):
         ###     View: https://pytorch.org/docs/stable/tensors.html#torch.Tensor.view
         ###     Flatten: https://pytorch.org/docs/stable/generated/torch.flatten.html
         # for index in w, we select the corresponding embedding vector
-        # w has shape (batch_size, n_features)
+        # w shape: (batch_size, n_features)
         # we want to get embeddings for each index and concatenate
 
         # get embeddings for each index in w
