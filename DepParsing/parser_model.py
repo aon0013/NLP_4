@@ -71,6 +71,26 @@ class ParserModel(nn.Module):
         ###     Dropout: https://pytorch.org/docs/stable/nn.html#dropout-layers
         ### 
         ### See the PDF for hints.
+        # ini embed_to_hidden weight and bias
+        self.embed_to_hidden_weight = nn.Parameter(
+            torch.empty(n_features * self.embed_size, hidden_size)
+        )
+        nn.init.xavier_uniform_(self.embed_to_hidden_weight)
+
+        self.embed_to_hidden_bias = nn.Parameter(torch.empty(hidden_size))
+        nn.init.uniform_(self.embed_to_hidden_bias)
+
+        # dropout layer
+        self.dropout = nn.Dropout(dropout_prob)
+
+        # ini hidden_to_logits weight and bias
+        self.hidden_to_logits_weight = nn.Parameter(
+            torch.empty(hidden_size, n_classes)
+        )
+        nn.init.xavier_uniform_(self.hidden_to_logits_weight)
+
+        self.hidden_to_logits_bias = nn.Parameter(torch.empty(n_classes))
+        nn.init.uniform_(self.hidden_to_logits_bias)
 
 
 
@@ -105,6 +125,21 @@ class ParserModel(nn.Module):
         ###     Gather: https://pytorch.org/docs/stable/torch.html#torch.gather
         ###     View: https://pytorch.org/docs/stable/tensors.html#torch.Tensor.view
         ###     Flatten: https://pytorch.org/docs/stable/generated/torch.flatten.html
+        # for index in w, we select the corresponding embedding vector
+        # w has shape (batch_size, n_features)
+        # we want to get embeddings for each index and concatenate
+
+        # get embeddings for each index in w
+        batch_size = w.shape[0]
+
+        # flatten w to get all indices: (batch_size * n_features,)
+        w_flat = w.view(-1)
+
+        # get embeddings for all indices: (batch_size * n_features, embed_size)
+        embeddings_flat = torch.index_select(self.embeddings, 0, w_flat)
+
+        # reshape to (batch_size, n_features * embed_size)
+        x = embeddings_flat.view(batch_size, self.n_features * self.embed_size)
 
 
 
@@ -142,6 +177,18 @@ class ParserModel(nn.Module):
         ### Please see the following docs for support:
         ###     Matrix product: https://pytorch.org/docs/stable/torch.html#torch.matmul
         ###     ReLU: https://pytorch.org/docs/stable/nn.html?highlight=relu#torch.nn.functional.relu
+        # get embeddings and concatenate
+        x = self.embedding_lookup(w)  # (batch_size, n_features * embed_size)
+
+        # first linear transformation and ReLU
+        h = torch.matmul(x, self.embed_to_hidden_weight) + self.embed_to_hidden_bias
+        h = F.relu(h)  # (batch_size, hidden_size)
+
+        # dropout
+        h = self.dropout(h)
+
+        # second linear transformation to get logits
+        logits = torch.matmul(h, self.hidden_to_logits_weight) + self.hidden_to_logits_bias
 
 
         ### END YOUR CODE

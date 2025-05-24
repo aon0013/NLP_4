@@ -31,7 +31,14 @@ class PartialParse(object):
         ### Note: The root token should be represented with the string "ROOT"
         ### Note: If you need to use the sentence object to initialize anything, make sure to not directly 
         ###       reference the sentence object.  That is, remember to NOT modify the sentence object. 
+        # ini stack with root
+        self.stack = ["ROOT"]
 
+        # ini buffer with sentence
+        self.buffer = list(sentence)  # use copy of sentence
+
+        # ini dependencies
+        self.dependencies = []
 
         ### END YOUR CODE
 
@@ -50,6 +57,28 @@ class PartialParse(object):
         ###         1. Shift
         ###         2. Left Arc
         ###         3. Right Arc
+        if transition == "S":  # SHIFT
+            # moves first word from buffer to stack
+            if self.buffer:
+                word = self.buffer.pop(0)
+                self.stack.append(word)
+
+        elif transition == "LA":  # LEFT-ARC
+            # create dependency: stack[-1] -> stack[-2]
+            # remove stack[-2]
+            if len(self.stack) >= 2:
+                dependent = self.stack.pop(-2)  # remove second to last (stack[-2])
+                head = self.stack[-1]  # top of stack (stack[-1])
+                self.dependencies.append((head, dependent))
+
+        elif transition == "RA":  # RIGHT-ARC
+            # create dependency: stack[-2] -> stack[-1]
+            # remove stack[-1]
+            if len(self.stack) >= 2:
+                dependent = self.stack.pop(-1)  # remove top of stack
+                head = self.stack[-1]  # new top of stack
+                self.dependencies.append((head, dependent))
+
 
 
         ### END YOUR CODE
@@ -101,6 +130,30 @@ def minibatch_parse(sentences, model, batch_size):
     ###             contains references to the same objects. Thus, you should NOT use the `del` operator
     ###             to remove objects from the `unfinished_parses` list. This will free the underlying memory that
     ###             is being accessed by `partial_parses` and may cause your code to crash.
+    # ini partial parses for all sentences
+    partial_parses = [PartialParse(sentence) for sentence in sentences]
+
+    # shallow copy to track unfinished parses
+    unfinished_parses = partial_parses[:]
+
+    # while not all sentences are parsed
+    while unfinished_parses:
+        # batch_size parses for minibatch
+        minibatch = unfinished_parses[:batch_size]
+
+        # predictions from model
+        transitions = model.predict(minibatch)
+
+        # apply predicted transitions
+        for i, transition in enumerate(transitions):
+            minibatch[i].parse_step(transition)
+
+        # remove finished parses (empty buffer and stack size 1)
+        unfinished_parses = [pp for pp in unfinished_parses
+                             if not (len(pp.buffer) == 0 and len(pp.stack) == 1)]
+
+    # get dependencies in original order
+    dependencies = [pp.dependencies for pp in partial_parses]
 
 
     ### END YOUR CODE
